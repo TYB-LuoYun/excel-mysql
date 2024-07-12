@@ -2,64 +2,207 @@
   <div class="app-container">
     <el-table
       v-loading="listLoading"
-      :data="list"
+      :data="list.records"
       element-loading-text="Loading"
       border
       fit
+      size="small"
       highlight-current-row
     >
       <el-table-column align="center" label="ID" width="95">
         <template slot-scope="scope">
-          {{ scope.$index }}
+          {{ scope.row.id}}
         </template>
       </el-table-column>
       <el-table-column label="数据库表名" align="center">
         <template slot-scope="scope">
-          {{ scope.row.title }}
+          {{ scope.row.tableName }}
         </template>
       </el-table-column>
       <el-table-column label="Excel名" align="center">
         <template slot-scope="scope">
-          <span>{{ scope.row.author }}</span>
+          <span>{{ scope.row.excelName }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="Excel标题行数" width="300" align="center">
+      <el-table-column label="Sheet名" width="200" align="center">
         <template slot-scope="scope">
-          {{ scope.row.pageviews }}
+          {{ scope.row.sheetName }}
+        </template>
+      </el-table-column>
+      <el-table-column label="Excel标题行数" width="120" align="center">
+        <template slot-scope="scope">
+          {{ scope.row.excelHeadRowNum }}
+        </template>
+      </el-table-column> 
+      <el-table-column label="Sheet索引" width="100" align="center">
+        <template slot-scope="scope">
+          {{ scope.row.sheetIndex }}
         </template>
       </el-table-column>
       <el-table-column
         align="center"
-        prop="created_at"
+        prop="updateTime"
         label="更新时间"
-        width="300"
+        width="250"
       >
         <template slot-scope="scope">
           <i class="el-icon-time" />
-          <span> {{ scope.row.display_time }}</span>
+          <span> {{ scope.row.updateTime }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="更新人" width="100" align="center">
+        <template slot-scope="scope">
+          {{ scope.row.updateBy }}
         </template>
       </el-table-column>
       <el-table-column fixed="right" label="操作" width="300" align="center">
         <template slot-scope="scope">
-          <button class="layui-btn layui-btn-info" style="position: relative">
-            上传更新
+           
+
+          <el-button
+          style="position: relative" 
+          type="text"
+          @click="importGuide(scope.row)"
+          size="small">
+           上传更新
+             
+        </el-button>
+
+          <el-button
+          style="margin-left:20px"
+          @click.native.prevent="view(scope.row )"
+          type="text"
+          size="small">
+           查看
+        </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-pagination   
+     
+      style="margin-top: 5px;"
+      background 
+      @size-change="handleSizeChangeList"
+      @current-change="handleCurrentChangeList"
+      :current-page="list.current"
+      :page-sizes="[10,20,50,100, 200, 300, 400]"
+      :page-size="list.size"
+      layout="->,total, sizes, prev, pager, next, jumper"
+      :total="list.total">
+    </el-pagination>
+   
+
+
+    <el-drawer 
+    v-if="tableRow.tableName"
+  :title="tableRow.tableName"
+  :visible.sync="table"
+  direction="rtl"
+  size="90%"  >  
+     <div class="div1"> 
+      <el-table :data="listTable.records"   height="100%" border  style="width: 100%" size="mini">
+        <el-table-column
+        type="index"
+        label="表行"
+        fixed="left"
+        :index="indexMethod"
+        width="50">
+      </el-table-column>
+       <el-table-column :key="index" v-for="(item,index) in head"  :property="item"  :label="item"  >
+       </el-table-column> 
+     </el-table>
+     <div  >
+      <el-pagination   
+      style="margin-top: 5px;"
+      background
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+      :current-page="listTable.current"
+      :page-sizes="[10,20,50,100, 200, 300, 400]"
+      :page-size="listTable.size"
+      layout="->,total, sizes, prev, pager, next, jumper"
+      :total="listTable.total">
+    </el-pagination>
+     </div>
+    </div>
+     
+</el-drawer>
+
+
+<el-dialog
+  title="导入向导"
+  :visible.sync="dialogVisible"
+  :before-close="cancel"
+  width="60%" >
+  <div>
+     <el-row>
+      <el-input placeholder="" v-model="form.fileName" readOnly="true">
+         <template   slot="append"> 
+          <el-button
+          style="position: relative;width: 100px;" 
+          type="text"
+          size="small">
+            选择文件
             <input
               type="file"
               multiple
               accept=".xls,.xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              style="position: absolute; top: 0px; left: 0px; opacity: 0"
+              style="position: absolute; top: -5px; left: 0px; opacity: 0;width:100px;display: block;height: 150px !important; "
               id="filez"
-              @change="uploadFiles"
+              @change="selectFiles( $event)"
             />
-          </button>
-        </template>
-      </el-table-column>
-    </el-table>
+        </el-button>
+           
+         </template>
+       </el-input>
+     </el-row>
+     <el-row   >
+      <el-col :span="3" style=" ">
+        <div >
+          <ul>
+            <li :key="index"  v-for="(item,index) in form.sheetArr"  >
+               <el-radio size="mini" v-model="form.sheetIndex" :label="item.sheetNo" border  >{{ item.sheetName }}</el-radio> 
+            </li>  
+          </ul>
+        </div>
+      </el-col>
+      <el-col :span="10" style="padding: 10px 0px;margin-left: 100px;">
+        <table style="width: 100%" border="1" cellspacing="1" v-if="form.sheetIndex!=null">
+              <thead>
+                  <tr>
+                    <th rowspan="2">源字段</th>     <!-- rowspan代表单元格纵向合并 -->
+                    <th colspan="2">表目标字段</th>  <!-- colspan代表单元格横向合并 -->
+                  </tr> 
+              </thead>
+              <tbody>
+                  <tr v-for="(value,key,index) in form.fieldMap" :key="index">
+                    <td>{{key}}</td>
+                    <td><el-select size="mini" v-model="form.fieldMap[key]" clearable placeholder="请选择">
+                        <el-option
+                          v-for="item in form.columns"
+                          :key="item"
+                          :label="item"
+                          :value="item">
+                        </el-option>
+                      </el-select>  </td> 
+                     
+                  </tr> 
+              </tbody>
+        </table>
+      </el-col>
+     </el-row>
+  </div>
+  <span slot="footer" class="dialog-footer">
+    <el-button @click="cancel">取 消</el-button>
+    <el-button type="primary" @click="confirm">确 定</el-button>
+  </span>
+</el-dialog>
   </div>
 </template>
 
 <script>
-import { getList } from "@/api/table";
+import { getList,listTable,getSheets,getFieldMap,updateExcelTable } from "@/api/table";
 import axios from "axios";
 export default {
   filters: {
@@ -74,19 +217,126 @@ export default {
   },
   data() {
     return {
-      list: null,
+      listTable:{},
+      list:{
+         
+      },
       listLoading: true,
+      table:false,
+      head:{}, 
+      dialogVisible:false,
+      form:{
+        file:null,
+        fileName:"",
+        sheetIndex:null,
+        sheetArr:[],
+        row:{},
+        columns:[],
+        fieldMap:{}
+      }, 
+      tableRow:{}
     };
+  },
+  computed:{
+    sheetIndex(){
+      return this.form.sheetIndex;
+    }
+  },
+  watch:{
+     async sheetIndex(newval,oldval){
+         this.getFieldMap();
+     } 
   },
   created() {
     this.fetchData();
   },
   mounted() {},
   methods: {
-    async uploadFiles(e) {
+    
+    cancel(){
+      this.dialogVisible = false
+      this.form={
+        file:null,
+        fileName:"",
+        sheetIndex:null,
+        sheetArr:[],
+        row:{},
+        columns:[],
+        fieldMap:{}
+      }
+    },
+    async confirm(){
+      var ft = new FormData();
+        ft.append("file",this.form.file);
+        ft.append("id",this.form.row.id);
+        ft.append("sheetIndex",this.form.sheetIndex);
+        ft.append("fieldMap",new Blob([JSON.stringify(this.form.fieldMap)], { type: 'application/json' }) )
+        ft.append("updateBy","admin")
+        let data = await updateExcelTable(ft)
+        if(data.success){
+           this.$message.success("操作成功")
+        }
+        this.fetchData()
+        this.cancel()
+        
+    },
+    async getFieldMap(){
+      if(this.form.sheetIndex!=null){
+        var ft = new FormData();
+        ft.append("file",this.form.file);
+        ft.append("id",this.form.row.id);
+        ft.append("sheetIndex",this.form.sheetIndex);
+        let data = await getFieldMap(ft);
+        this.form.columns = data.data.columns;
+        this.form.fieldMap = data.data.fieldMap; 
+      }
+    },
+    importGuide(row){
+      this.form.row = row;
+      this.dialogVisible = true 
+    },
+    async selectFiles(e){
+       this.form.sheetIndex= null;
+       console.log(e.target.files[0]);
+       this.form.fileName = e.target.files[0].name;
+      // 获取sheet
+       var ft = new FormData();
+       ft.append("file", e.target.files[0]);
+       console.log(ft);
+       let arr = await getSheets(ft);
+       this.form.sheetArr= arr.data; 
+       this.form.file = e.target.files[0]; 
+       this.form.sheetIndex = this.form.row.sheetIndex;  
+       e.target.value = '';
+    },
+    handleSizeChange(val){
+      this.listTable.size = val 
+       this.listTablePage()
+    },
+    handleCurrentChange(val){
+      this.listTable.current = val 
+      this.listTablePage()
+    },
+    indexMethod(index) {
+      return (this.listTable.current - 1) * this.listTable.size+ index + 1 + this.tableRow.excelHeadRowNum
+    },
+    async view(row){
+        this.table = true;
+        this.tableRow = row
+        this.listTablePage()
+    },
+    async listTablePage(){
+      let data = await listTable({id:this.tableRow.id,current:this.listTable.current,size:this.listTable.size}); 
+        this.listTable = data.data.data
+        this.head = data.data.head  
+    },
+    async uploadFiles(row,e) {
       console.log(e.target.files[0]);
+      console.log(row);
       var form = new FormData();
       form.append("file", e.target.files[0]);
+      form.append("id", row.id);
+      e.target.value = '';
       var config = {
         onUploadProgress: (progressEvent) => {
           var complete =
@@ -94,31 +344,67 @@ export default {
         },
       };
       (axios.defaults.baseURL = process.env.VUE_APP_BASE_API), // url = base url + request url
-        await axios.post(`file/upload.action`, form, config).then((res) => {
+        await axios.post(`/excel-mysql/updateExcelTable`, form, config).then((res) => {
           // this.$set(this.progrees, i, "100%");
-
+          console.log("=======================================ok");
           if (res.status == 200 && res.data.code == "200") {
-            // this.$set(this.success, i, true);
-            console.log("=======================================ok");
+            console.log("=======================================ok2");
+            // this.$set(this.success, i, true); 
+            this.$message({
+             message: "上传完成",
+             type: 'success'
+            });
+            
             this.file.done = i + 1;
+
           } else {
+            console.log("错误");
+            console.log(res.data)
+            this.$message.error(res.data.message);
             if (res.data.msg == "") {
               // this.$set(this.success, i, "服务器错误");
             } else {
               // this.$set(this.success, i, res.data.msg);
             }
+           
 
             // this.$set(this.msgs,i,res.data.msg);
             console.log("=======================================error");
           }
 
           console.log(res);
-        });
+        }).catch((error) => {
+            if (error.response) {
+              // 请求已发出，服务器以状态码响应，但状态代码超出了2xx的范围
+              if (error.response.status === 500) {
+                this.$message.error(error.response.data.message);
+                console.error('Server error 500:', error.response.data);
+                // 处理500错误
+              } else {
+                console.error('Other error:', error.response.data);
+                // 处理其他错误
+              }
+            } else if (error.request) {
+              // 请求已发出但没有收到响应
+              console.error('No response received:', error.request);
+            } else {
+              // 发生在设置请求时触发的错误
+              console.error('Error in setting up request:', error.message);
+            }
+          });
+    },
+    handleSizeChangeList(val){
+      this.list.size = val 
+       this.fetchData()
+    },
+    handleCurrentChangeList(val){
+      this.list.current = val 
+      this.fetchData()
     },
     fetchData() {
       this.listLoading = true;
-      getList().then((response) => {
-        this.list = response.data.items;
+      getList({size: this.list.size,current: this.list.current}).then((response) => {
+        this.list = response.data;
         this.listLoading = false;
       });
     },
@@ -127,11 +413,39 @@ export default {
 </script>
 
 <style scoped>
+
+ul{
+  padding: 0px 0px;
+}
+ul li{
+  list-style: none;
+  padding: 3px 5px;
+}
+.div1{
+  width:100%;height: calc(100vh - 150px);
+  /* background-color: red; */
+}
+
+table {
+      border-collapse: collapse;  
+      border-color: #dfe6ec;  
+}
+thead tr th {
+      background-color: #f8f8f9;  
+      padding: 6px;
+      text-align: center;
+}
+tbody tr td {
+      padding: 6px;
+      text-align: center;
+      height: 34px; 
+}
 .layui-btn {
   background-color: rgba(188, 58, 115, 1);
   color: white;
   border: 0px;
   padding: 4px 10px;
+  display:inline-block;
   align-content: center;
 }
 </style>
