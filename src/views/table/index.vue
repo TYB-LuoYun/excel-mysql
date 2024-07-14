@@ -557,6 +557,7 @@ export default {
     },
     listTableClose() {
       this.table = false;
+      this.listTable.current = 1;
       this.listTable.records = [];
     },
     handleCurrentChange(val) {
