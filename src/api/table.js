@@ -40,3 +40,20 @@ export function updateExcelTable(params){
     data:params 
   })
 }
+
+export function previewCreateTable(params){
+  return request({
+    url: '/excel-mysql/previewCreateTable',
+    method: 'post',
+    data:params 
+  })
+}
+
+
+export function newExcelTable(params){
+  return request({
+    url: '/excel-mysql/newExcelTable',
+    method: 'post',
+    data:params 
+  })
+}
