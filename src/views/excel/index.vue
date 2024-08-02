@@ -192,9 +192,9 @@
             </template>
           </el-input>
         </el-row>
-        <el-row style="display: flex; flex-decration: row">
+        <el-row style="display: flex; flex-decration: row" v-if="form.sheetIndex != null">
           <el-col
-            :span="3"
+            :span="4"
             style="
               border-right: 1px solid rgba(0, 0, 0, 0.1);
               margin-right: 30px;
@@ -214,6 +214,29 @@
               </ul>
             </div>
           </el-col>
+          <el-col :span="6">
+            <div style="margin-top: 18px">
+              <el-form
+                :label-position="'left'"
+                label-width="80px"
+                :model="form"
+                size="mini"
+              >
+                <el-form-item label="表名">
+                  <el-input v-model="form.tableName" disabled></el-input>
+                </el-form-item>
+                <el-form-item label="标题行数">
+                  <el-input-number
+                    v-model="form.excelHeadRowNum"
+                    controls-position="right" 
+                    @change="excelHeadRowNumChange()"
+                    :min="1"
+                    :max="10"
+                  ></el-input-number>
+                </el-form-item>
+              </el-form>
+            </div>
+          </el-col>
           <el-col :span="10" style="padding: 10px 0px; margin-left: 100px">
             <table
               style="width: 100%"
@@ -225,8 +248,9 @@
                 <tr>
                   <th rowspan="2">源字段</th>
                   <!-- rowspan代表单元格纵向合并 -->
-                  <th colspan="2">表目标字段</th>
+                  <th rowspan="2">表目标字段</th>
                   <!-- colspan代表单元格横向合并 -->
+                  <th  style="width: 60px;">主键</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,6 +272,9 @@
                       </el-option>
                     </el-select>
                   </td>
+                  <td :key="index" @click="handleKey(form.fieldMap[key],index)">  
+                    <i :key="index" class="el-icon-key" v-show="formKeys(form.fieldMap[key])" style="color: rgb(255, 0, 191);"></i>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -256,7 +283,8 @@
       </div>
       <span slot="footer" class="dialog-footer">
         <el-button @click="cancel">取 消</el-button>
-        <el-button type="primary" @click="confirm">确 定</el-button>
+        <el-button type="primary"  @click="confirm2">追 加</el-button>
+        <el-button type="primary" @click="confirm">覆 盖</el-button>
       </span>
     </el-dialog>
 
@@ -296,7 +324,7 @@
           v-if="newTable.sheetIndex != null"
         >
           <el-col
-            :span="2"
+            :span="4"
             style="
               border-right: 1px solid rgba(0, 0, 0, 0.1);
               margin-right: 30px;
@@ -380,7 +408,7 @@
 
 <script>
 import {
-  getList,
+  lists,
   listTable,
   getSheets,
   getFieldMap,
@@ -401,7 +429,7 @@ export default {
     },
   },
   data() {
-    return {
+    return { 
       newTab: {
         show: false,
       },
@@ -428,6 +456,11 @@ export default {
     sheetIndex() {
       return this.form.sheetIndex;
     },
+    formKeys(){
+      return function(column){
+        return Object.keys(this.form.keys).includes(column)
+      }
+    }
   },
   watch: {
     async sheetIndex(newval, oldval) {
@@ -451,14 +484,42 @@ export default {
         fieldMap: {},
       };
     },
-    async confirm() {
+    handleKey(column,index){
+      if(Object.keys(this.form.keys).includes(column)){
+        delete this.form.keys[column]
+      }else{
+          this.form.keys[column]=index 
+      }
+
+      this.form.keys = JSON.parse(JSON.stringify(this.form.keys));
+    
+      this.$forceUpdate();
+      console.log(this.form.keys)
+      
+    },
+    confirm2(){
+      this.confirm(null,1);
+    },
+    async confirm(e,val) {
       var ft = new FormData();
       ft.append("file", this.form.file);
       ft.append("id", this.form.row.id);
       ft.append("sheetIndex", this.form.sheetIndex);
+      if(val){
+        ft.append("mode", val);//1是追加
+      }
+      if(this.form.excelHeadRowNum!=null && this.form.excelHeadRowNum!=undefined){
+        ft.append("excelHeadRowNum",this.form.excelHeadRowNum);
+      }
       ft.append(
         "fieldMap",
         new Blob([JSON.stringify(this.form.fieldMap)], {
+          type: "application/json",
+        })
+      );
+      ft.append(
+        "keys",
+        new Blob([JSON.stringify(this.form.keys)], {
           type: "application/json",
         })
       );
@@ -476,9 +537,21 @@ export default {
         ft.append("file", this.form.file);
         ft.append("id", this.form.row.id);
         ft.append("sheetIndex", this.form.sheetIndex);
+        if(this.form.excelHeadRowNum!= null && this.form.excelHeadRowNum!=undefined){
+          ft.append("excelHeadRowNum", this.form.excelHeadRowNum)
+        }
         let data = await getFieldMap(ft);
         this.form.columns = data.data.columns;
         this.form.fieldMap = data.data.fieldMap;
+        this.form.tableName = data.data.tableName;
+        this.form.excelHeadRowNum = data.data.excelHeadRowNum
+        this.form.keys=data.data.keys
+      }
+    },
+    excelHeadRowNumChange( ) {
+      // this.getFieldMap();
+      if(this.form.excelHeadRowNum!=null && this.form.excelHeadRowNum!=undefined){
+        this.getFieldMap();
       }
     },
     importGuide(row) {
@@ -548,7 +621,7 @@ export default {
       console.log(ft);
       let arr = await getSheets(ft);
       this.form.sheetArr = arr.data;
-
+      
       this.form.sheetIndex = this.form.row.sheetIndex;
     },
     handleSizeChange(val) {
@@ -660,7 +733,7 @@ export default {
     },
     fetchData() {
       this.listLoading = true;
-      getList({ size: this.list.size, current: this.list.current }).then(
+      lists({ size: this.list.size, current: this.list.current }).then(
         (response) => {
           this.list = response.data;
           this.listLoading = false;

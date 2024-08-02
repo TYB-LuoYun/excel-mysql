@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-export function getList(params) {
+export function lists(params) {
   return request({
     url: '/excel-mysql/lists',
     method: 'get',

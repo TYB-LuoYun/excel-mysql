@@ -43,14 +43,29 @@ export const constantRoutes = [
     hidden: true
   },
 
+  // {
+  //   path: '/',
+  //   component: Layout,
+  //   redirect: '/dashboard',
+  //   children: [ {
+  //     path: 'dashboard',
+  //     name: '数据管理',
+  //     component: () => import('@/views/table/index'),
+  //     meta: { title: '表格维护', icon: 'table' }
+  //   } ]
+  // },
+
   {
-    path: '/',
+    path: '/shop',
     component: Layout,
-    redirect: '/dashboard',
+    redirect: '/shop/excel',
+    name: '商品部',
+    alwaysShow: true,
+    meta: { title: '商品部', icon: 'dashboard'  },
     children: [ {
-      path: 'dashboard',
-      name: '数据管理',
-      component: () => import('@/views/table/index'),
+      path: 'excel', 
+      component: () => import('@/views/excel/index'),
+      name: '商品部', 
       meta: { title: '表格维护', icon: 'table' }
     } ]
   },
