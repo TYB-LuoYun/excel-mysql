@@ -160,7 +160,7 @@
       title="导入向导"
       :visible.sync="dialogVisible"
       :before-close="cancel"
-      width="60%"
+      width="80%"
     >
       <div>
         <el-row>
@@ -175,7 +175,7 @@
                 <input
                   type="file"
                   multiple
-                  accept=".xls,.xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  accept=".csv,.xls,.xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   style="
                     position: absolute;
                     top: -5px;
@@ -218,7 +218,7 @@
             <div style="margin-top: 18px">
               <el-form
                 :label-position="'left'"
-                label-width="80px"
+                label-width="90px"
                 :model="form"
                 size="mini"
               >
@@ -234,10 +234,21 @@
                     :max="10"
                   ></el-input-number>
                 </el-form-item>
+
+                <el-form-item label="数据起始行">
+                  <el-input-number
+                    v-model="form.dataStartRowNum"
+                    controls-position="right" 
+                    @change="excelHeadRowNumChange()"
+                    :min="1"
+                    :max="10"
+                  ></el-input-number>
+                </el-form-item>
+                
               </el-form>
             </div>
           </el-col>
-          <el-col :span="10" style="padding: 10px 0px; margin-left: 100px">
+          <el-col :span="14" style="padding: 10px 0px; margin-left: 100px">
             <table
               style="width: 100%"
               border="1"
@@ -246,22 +257,44 @@
             >
               <thead>
                 <tr>
-                  <th rowspan="2">源字段</th>
+                  <th style="width: 10px;">源字段</th>
                   <!-- rowspan代表单元格纵向合并 -->
-                  <th rowspan="2">表目标字段</th>
+                  <th style="width: 50px;">表目标字段</th>
                   <!-- colspan代表单元格横向合并 -->
-                  <th  style="width: 60px;">主键</th>
+                  <th style="width: 10px;" >主键</th>
+                  <th style="width: 30px;">
+                       类型
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(value, key, index) in form.fieldMap" :key="index">
-                  <td>{{ key }}</td>
                   <td>
+                    <span  v-if="form.fieldMap[key] != '$dates'">
+                      {{ key }}
+                    </span>
+                    <span  v-if="form.fieldMap[key] == '$dates'">
+                      <el-date-picker 
+                        width="200px"
+                        size="mini"
+                        v-model="form.custom.$dates"
+                        value-format="yyyy-MM"
+                        type="month" 
+                        placeholder="选择月">
+                      </el-date-picker>
+                    </span>
+                    
+                  </td>
+                  <td>
+                    <span  v-if="form.fieldMap[key] == '$dates'">
+                         归属日期
+                    </span>
                     <el-select
                       size="mini"
                       v-model="form.fieldMap[key]"
                       clearable
                       placeholder="请选择"
+                      v-if="form.fieldMap[key] != '$dates'"
                     >
                       <el-option
                         v-for="item in form.columns"
@@ -275,6 +308,25 @@
                   <td :key="index" @click="handleKey(form.fieldMap[key],index)">  
                     <i :key="index" class="el-icon-key" v-show="formKeys(form.fieldMap[key])" style="color: rgb(255, 0, 191);"></i>
                   </td>
+                  <td>
+                     <div :key="index"  v-if="item.columnName == form.fieldMap[key]"    v-for="(item,index) in columnInfo">
+                      <el-select   
+                      
+                      size="mini"
+                      v-model="item.dataType"
+                      placeholder="请选择"
+                    >
+                      <el-option
+                        v-for="item in form.dataTypes"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                      >
+                      </el-option>
+                    </el-select>
+                     </div>
+ 
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -286,6 +338,9 @@
         <el-button type="primary"  @click="confirm2">追 加</el-button>
         <el-button type="primary" @click="confirm">覆 盖</el-button>
       </span>
+      <div style="display: flex; justify-content: center; margin: auto;margin-top: 20px;" v-if="process.show">
+        <el-progress type="circle" :percentage="process.percentage"></el-progress> 
+      </div>
     </el-dialog>
 
     <el-dialog title="创建表向导" :visible.sync="newTab.show" width="60%">
@@ -302,7 +357,7 @@
                 <input
                   type="file"
                   multiple
-                  accept=".xls,.xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  accept=".csv,.xls,.xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   style="
                     position: absolute;
                     top: -5px;
@@ -415,6 +470,7 @@ import {
   updateExcelTable,
   previewCreateTable,
   newExcelTable,
+  getProcess
 } from "@/api/table";
 import axios from "axios";
 export default {
@@ -430,6 +486,7 @@ export default {
   },
   data() {
     return { 
+      columnInfo:[],
       newTab: {
         show: false,
       },
@@ -448,8 +505,15 @@ export default {
         row: {},
         columns: [],
         fieldMap: {},
+        custom:{
+          $dates:null
+        }
       },
       tableRow: {},
+      process:{
+        show:false,
+        percentage:0
+      }
     };
   },
   computed: {
@@ -473,6 +537,7 @@ export default {
   mounted() {},
   methods: {
     cancel() {
+      this.process.show = false;
       this.dialogVisible = false;
       this.form = {
         file: null,
@@ -482,6 +547,10 @@ export default {
         row: {},
         columns: [],
         fieldMap: {},
+        custom:{
+          $dates:null
+        }
+        
       };
     },
     handleKey(column,index){
@@ -500,7 +569,26 @@ export default {
     confirm2(){
       this.confirm(null,1);
     },
-    async confirm(e,val) {
+    async confirm(e,val) {  
+      if(!val){
+        this.$confirm('此操作将删除现有数据, 是否继续?', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+           this.confirmWork(val)
+        }).catch(() => {
+          this.$message({
+            type: 'info',
+            message: '已取消'
+          });
+          return
+        })  ;      
+      }else{
+        this.confirmWork(val)
+      }
+    },
+    async confirmWork(val){
       var ft = new FormData();
       ft.append("file", this.form.file);
       ft.append("id", this.form.row.id);
@@ -511,23 +599,71 @@ export default {
       if(this.form.excelHeadRowNum!=null && this.form.excelHeadRowNum!=undefined){
         ft.append("excelHeadRowNum",this.form.excelHeadRowNum);
       }
+
+      if(this.form.dataStartRowNum!=null && this.form.dataStartRowNum!=undefined){
+        ft.append("dataStartRowNum",this.form.dataStartRowNum);
+      }
       ft.append(
         "fieldMap",
         new Blob([JSON.stringify(this.form.fieldMap)], {
           type: "application/json",
         })
       );
+
+      
+      if ('$dates' in this.form.fieldMap) {
+         if(!this.form.custom.$dates){
+             console.log(this.form.custom.$dates)
+             this.$message.error("请选择归属日期字段");
+             return;
+         }
+      }
+
+      ft.append(
+        "custom",
+        new Blob([JSON.stringify(this.form.custom)], {
+          type: "application/json",
+        })
+      );
+
+
       ft.append(
         "keys",
         new Blob([JSON.stringify(this.form.keys)], {
           type: "application/json",
         })
       );
+      console.log("ss=============");
+      console.log(this.columnInfo);
+      ft.append(
+        "columnInfo",
+        new Blob([JSON.stringify(this.columnInfo)], {
+          type: "application/json",
+        })
+      );
       ft.append("updateBy", "admin");
+      console.log("定时器")
+      let tableName = this.form.row.tableName
+      this.process.show = true;
+      const intervalId = setInterval(async () => {
+        console.log("定时器执行")
+        console.log( this.form.row)
+        let data = await getProcess({tableName:tableName });
+        if (data.success) {
+        console.log(data.data);
+        this.process.percentage = Math.round(data.data*100)
+      }
+     }, 1000); 
       let data = await updateExcelTable(ft);
+      // 获取进度 
       if (data.success) {
         this.$message.success("操作成功");
+        clearInterval(intervalId);
       }
+  
+
+// 如果需要停止定时器，可以使用 clearInterval
+      // clearInterval(intervalId);
       this.fetchData();
       this.cancel();
     },
@@ -540,19 +676,33 @@ export default {
         if(this.form.excelHeadRowNum!= null && this.form.excelHeadRowNum!=undefined){
           ft.append("excelHeadRowNum", this.form.excelHeadRowNum)
         }
+        if(this.form.dataStartRowNum!= null && this.form.dataStartRowNum!=undefined){
+          ft.append("dataStartRowNum", this.form.dataStartRowNum)
+        }
         let data = await getFieldMap(ft);
         this.form.columns = data.data.columns;
+        this.form.custom = JSON.parse(JSON.stringify(data.data.custom));
+        console.log("数据");
+        console.log(this.form.custom)
+        console.log(this.form.custom.$dates)
+        this.columnInfo = data.data.columnInfo;
+        this.form.dataTypes = data.data.dataTypes;
         this.form.fieldMap = data.data.fieldMap;
         this.form.tableName = data.data.tableName;
         this.form.excelHeadRowNum = data.data.excelHeadRowNum
+        this.form.dataStartRowNum = data.data.dataStartRowNum
         this.form.keys=data.data.keys
       }
     },
     excelHeadRowNumChange( ) {
       // this.getFieldMap();
+      if(this.form.dataStartRowNum <= this.form.excelHeadRowNum){
+        this.form.dataStartRowNum = this.form.excelHeadRowNum+1;
+      }
       if(this.form.excelHeadRowNum!=null && this.form.excelHeadRowNum!=undefined){
         this.getFieldMap();
       }
+
     },
     importGuide(row) {
       this.form.row = row;

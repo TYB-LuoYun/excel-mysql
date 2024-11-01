@@ -25,7 +25,7 @@ export function getSheets(params) {
 
 export function getFieldMap(params){
   return request({
-    url: '/excel-mysql/getFieldMap',
+    url: '/excel-mysql/getFieldMaps',
     method: 'post',
     data:params 
   })
@@ -40,6 +40,17 @@ export function updateExcelTable(params){
     data:params 
   })
 }
+
+
+
+export function getProcess(params){
+  return request({
+    url: '/excel-mysql/getProcess',
+    method: 'get' ,
+    params
+  })
+}
+
 
 export function previewCreateTable(params){
   return request({
